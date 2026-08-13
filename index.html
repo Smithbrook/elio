@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ElioView: Race to the Sun</title>
+<meta name="description" content="A solar-system trivia arcade game for kids. Answer questions to race from Neptune to the Sun.">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23FFC24D'/%3E%3Ccircle cx='9' cy='10' r='1.3' fill='%237A3E00'/%3E%3Ccircle cx='15' cy='10' r='1.3' fill='%237A3E00'/%3E%3Cpath d='M8 14 Q12 17 16 14' stroke='%237A3E00' stroke-width='1.3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Nunito',sans-serif; min-height:100vh;
+    background:radial-gradient(circle at 50% 0%, #1B2154 0%, #0B0E2A 60%, #060714 100%);
+    color:#F5F3FF; position:relative; overflow-x:hidden;
+  }
+  a{color:inherit;}
+  button{font:inherit;}
+
+  @keyframes twinkle{0%,100%{opacity:.2;}50%{opacity:.9;}}
+  @keyframes floatUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes popIn{from{opacity:0;transform:scale(.9);}to{opacity:1;transform:scale(1);}}
+  @keyframes shake{10%,90%{transform:translateX(-2px);}20%,80%{transform:translateX(3px);}30%,50%,70%{transform:translateX(-5px);}40%,60%{transform:translateX(5px);}}
+  .eliov-btn{transition:transform .12s ease, box-shadow .12s ease; cursor:pointer;}
+  .eliov-btn:active{transform:scale(0.97);}
+  .eliov-card{animation:popIn .3s ease;}
+  .eliov-card.wrong{animation:shake .4s ease;}
+  .floatUp{animation:floatUp .4s ease;}
+
+  #starfield{position:absolute; inset:0; overflow:hidden; z-index:0;}
+  #starfield .star{position:absolute; border-radius:50%; background:#fff; opacity:.6;}
+
+  #sidebarToggle{
+    position:fixed; top:18px; left:18px; z-index:30;
+    width:38px; height:38px; border-radius:10px;
+    border:1px solid rgba(255,255,255,0.15); background:rgba(11,14,42,0.7); backdrop-filter:blur(6px);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; color:#F5F3FF;
+  }
+  #sidebar{
+    position:fixed; top:0; left:0; bottom:0; width:268px; z-index:25;
+    background:#12163A; border-right:1px solid rgba(255,255,255,0.08);
+    transform:translateX(-100%); transition:transform .28s cubic-bezier(.4,0,.2,1);
+    display:flex; flex-direction:column; justify-content:space-between; padding:20px 18px;
+  }
+  #sidebar.open{transform:translateX(0);}
+  .sidebar-brand{display:flex; align-items:center; gap:10px; margin-bottom:22px; padding-left:44px;}
+  .sidebar-brand span{font-family:'Baloo 2',sans-serif; font-weight:700; font-size:16px;}
+  .sidebar-label{font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; opacity:.4; margin:0 0 10px;}
+  #sidebar ul{margin:0; padding-left:18px; font-size:13px; line-height:1.7; opacity:.8;}
+  .sidebar-support{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    font-family:'Baloo 2',sans-serif; font-weight:700; font-size:13.5px;
+    padding:10px 14px; border-radius:999px; text-decoration:none;
+    border:1px solid rgba(255,255,255,0.18); color:#F5F3FF; margin-bottom:14px;
+  }
+  .sidebar-credit{font-size:11.5px; opacity:.55; margin:0 0 4px;}
+  .sidebar-credit a{color:#F5F3FF;}
+  .sidebar-copy{font-size:11px; opacity:.35; margin:0; font-family:'JetBrains Mono',monospace;}
+
+  #backdrop{position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:20; opacity:0; pointer-events:none; transition:opacity .25s ease;}
+  #backdrop.show{opacity:1; pointer-events:auto;}
+  @media (min-width:769px){ #backdrop{display:none;} }
+
+  #shiftWrap{transition:margin-left .28s cubic-bezier(.4,0,.2,1); margin-left:0; position:relative; z-index:1;}
+  @media (min-width:769px){ #shiftWrap.open{margin-left:268px;} }
+
+  #content{max-width:640px; margin:0 auto; padding:28px 20px 40px;}
+
+  .planet-row{display:flex; align-items:center; gap:4px; overflow-x:auto; padding:6px 4px;}
+  .planet-connector{width:16px; height:2px; flex-shrink:0; background:rgba(255,255,255,0.2);}
+  .planet-connector.done{background:#FFB84D;}
+  .planet-wrap{border-radius:50%; transition:all .3s ease;}
+  .planet-wrap.current{box-shadow:0 0 0 3px #FFB84D; transform:scale(1.15);}
+
+  .mode-btn{
+    font-family:'Baloo 2',sans-serif; font-weight:700; font-size:14px;
+    padding:10px 18px; border-radius:999px; cursor:pointer;
+    border:2px solid rgba(255,255,255,0.15); background:transparent; color:#F5F3FF;
+  }
+  .mode-btn.active{border-color:#FFB84D; background:rgba(255,184,77,0.15);}
+
+  .btn-primary{
+    font-family:'Baloo 2',sans-serif; font-weight:800; font-size:18px;
+    padding:14px 36px; border-radius:999px; border:none; cursor:pointer;
+    background:linear-gradient(135deg,#FFB84D,#FF8A5C); color:#3A1E00;
+    display:inline-flex; align-items:center; gap:8px;
+    box-shadow:0 8px 24px rgba(255,138,92,0.35);
+  }
+  .btn-continue{
+    font-family:'Baloo 2',sans-serif; font-weight:700; font-size:15px;
+    padding:10px 22px; border-radius:999px; border:none; cursor:pointer;
+    background:#FFB84D; color:#3A1E00;
+  }
+
+  .hud-row{display:flex; justify-content:space-between; align-items:center; margin:18px 0 10px;}
+  .shields{display:flex; gap:4px;}
+  .score{font-family:'JetBrains Mono',monospace; font-size:13px; opacity:.8; display:flex; align-items:center; gap:4px;}
+
+  .timer-track{height:6px; border-radius:3px; background:rgba(255,255,255,0.1); overflow:hidden; margin-bottom:4px;}
+  .timer-fill{height:100%; transition:width 1s linear;}
+  .timer-text{font-size:12px; opacity:.6; margin:0 0 16px; text-align:right;}
+
+  .planet-header{display:flex; align-items:center; gap:10px; margin-bottom:16px;}
+  .planet-header h3{font-family:'Baloo 2',sans-serif; font-weight:700; font-size:17px; margin:0;}
+  .planet-header p{font-size:12px; opacity:.6; margin:0;}
+
+  .question-card{
+    background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
+    border-radius:18px; padding:20px 18px; margin-bottom:16px;
+  }
+  .question-card p{font-family:'Baloo 2',sans-serif; font-weight:700; font-size:19px; line-height:1.35; margin:0;}
+  .question-card.boss{ background:rgba(255,184,77,0.08); border-color:rgba(255,184,77,0.25); }
+  .question-card.boss p{font-size:18px;}
+
+  .choices-grid{display:grid; gap:10px;}
+  .choice-btn{
+    font-family:'Nunito',sans-serif; font-weight:700; font-size:15px;
+    padding:14px 12px; border-radius:14px; cursor:pointer; text-align:left;
+    border:2px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:#F5F3FF;
+  }
+  .choice-btn.boss{ font-size:14px; padding:13px 10px; }
+  .choice-btn.correct{ border-color:#6FBF97; background:rgba(111,191,151,0.18); }
+  .choice-btn.wrongpick{ border-color:#FF5C5C; background:rgba(255,92,92,0.15); }
+  .choice-btn:disabled{cursor:default;}
+
+  .feedback-block{margin-top:16px;}
+  .feedback-title{font-weight:800; margin:0 0 6px; font-family:'Baloo 2',sans-serif;}
+  .feedback-title.correct{color:#6FBF97;}
+  .feedback-title.wrong{color:#FF8A8A;}
+  .feedback-fact{font-size:13.5px; opacity:.8; margin:0 0 14px;}
+
+  .badge{margin-top:22px; border-radius:999px; padding:6px 16px; font-size:13px; font-weight:600; display:inline-block;}
+  .badge.best{border:1px solid rgba(255,184,77,0.3); background:rgba(255,184,77,0.15); color:#FFB84D;}
+  .badge.off{border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:#c9c9d6; font-family:'JetBrains Mono',monospace;}
+
+  .center-screen{text-align:center; padding-top:50px;}
+  .stat-card{background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:18px 24px; display:inline-block; margin-bottom:24px;}
+  .stat-label{font-family:'JetBrains Mono',monospace; font-size:13px; opacity:.7; margin:0 0 4px;}
+  .stat-score{font-family:'Baloo 2',sans-serif; font-weight:800; font-size:30px; margin:0 0 10px; color:#FFB84D;}
+  .stat-rank{font-family:'Baloo 2',sans-serif; font-weight:700; font-size:18px; margin:0;}
+</style>
+</head>
+<body>
+
+<div id="starfield"></div>
+
+<button id="sidebarToggle" aria-label="Open menu">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/>
+    <line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.6"/>
+  </svg>
+</button>
+
+<div id="backdrop"></div>
+
+<div id="sidebar">
+  <div>
+    <div class="sidebar-brand" id="sunLogoSlot"></div>
+    <p class="sidebar-label">How to play</p>
+    <ul>
+      <li>Answer questions correctly to travel from Neptune to the Sun.</li>
+      <li>Wrong answers cost a shield — lose them all and it's game over.</li>
+      <li>Each planet has its own twist. Watch the timer.</li>
+      <li>Make it all the way to the Sun and win by beating the final Solar Boss Round.</li>
+    </ul>
+  </div>
+  <div>
+    <a class="sidebar-support" href="https://ko-fi.com/smithideas" target="_blank" rel="noopener noreferrer">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s-7.5-4.6-10-9.3C0.3 8.2 2 4.5 5.6 4.1c2-.2 3.6.8 4.4 2.3.8-1.5 2.4-2.5 4.4-2.3 3.6.4 5.3 4.1 3.6 7.6C19.5 16.4 12 21 12 21z" stroke="currentColor" stroke-width="1.6"/></svg>
+      Support this project
+    </a>
+    <p class="sidebar-credit">Built by <a href="https://smithideas.com" target="_blank" rel="noopener noreferrer">Smith Ideas</a></p>
+    <p class="sidebar-copy">© 2026 Smith Ideas, LLC</p>
+  </div>
+</div>
+
+<div id="shiftWrap">
+  <div id="content"></div>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+
+  /* ============================================================
+     Data
+     ============================================================ */
+  const PLANETS = [
+    { key:'neptune', name:'Neptune', color:'#3B5BA5', accent:'#6C8FE0', ring:false, spot:false, timer:16 },
+    { key:'uranus', name:'Uranus', color:'#6FC9C0', accent:'#A8E6DE', ring:'tilt', spot:false, timer:15 },
+    { key:'saturn', name:'Saturn', color:'#D9B37C', accent:'#F0DDB0', ring:true, spot:false, timer:14, twist:'elimination' },
+    { key:'jupiter', name:'Jupiter', color:'#C98B5E', accent:'#E8B98A', ring:false, spot:true, timer:13 },
+    { key:'mars', name:'Mars', color:'#B94A32', accent:'#E07854', ring:false, spot:false, timer:13, twist:'mixed' },
+    { key:'earth', name:'Earth', color:'#3C7A5E', accent:'#6FBF97', ring:false, spot:false, timer:12 },
+    { key:'venus', name:'Venus', color:'#E0A94E', accent:'#F4CE85', ring:false, spot:false, timer:11, twist:'heat' },
+    { key:'mercury', name:'Mercury', color:'#9C9C96', accent:'#C9C9C2', ring:false, spot:false, timer:9, twist:'rapid' },
+  ];
+
+  const QUESTIONS = {
+    neptune: [
+      { q:"Neptune is the ___ planet from the Sun.", choices:["Seventh","Eighth","Ninth","Sixth"], correct:1, fact:"Neptune is the eighth and farthest planet from the Sun." },
+      { q:"What gives Neptune its deep blue color?", choices:["Water oceans","Methane in its atmosphere","Blue rock","Reflected sunlight"], correct:1, fact:"Methane gas absorbs red light and reflects blue, giving Neptune its color." },
+      { q:"How was Neptune first found?", choices:["With the naked eye","By math, before anyone saw it","By a space probe","By accident"], correct:1, fact:"Scientists predicted Neptune's location using math before a telescope ever confirmed it, in 1846." },
+      { q:"Neptune's largest moon is called:", choices:["Titan","Europa","Triton","Io"], correct:2, fact:"Triton is unusual because it orbits Neptune backwards compared to most large moons." },
+      { q:"Which planet has the fastest winds in the solar system?", choices:["Jupiter","Neptune","Saturn","Venus"], correct:1, fact:"Neptune's winds can blow over 1,200 miles per hour." },
+      { q:"About how many Earths could fit inside Neptune?", choices:["4","57","1,300","10"], correct:1, fact:"Neptune is about 57 times the volume of Earth." },
+      { q:"Neptune is what kind of planet?", choices:["Rocky","Ice giant","Gas dwarf","Dwarf planet"], correct:1, fact:"Neptune and Uranus are called 'ice giants' because of the icy materials in their interiors." },
+    ],
+    uranus: [
+      { q:"What's unusual about how Uranus spins?", choices:["It doesn't spin","It spins on its side","It spins backwards only","It spins twice as fast as Earth"], correct:1, fact:"Uranus is tilted almost 98 degrees — it basically rolls along its orbit." },
+      { q:"Uranus was the first planet discovered using a:", choices:["Telescope","Satellite","Math equation","Space probe"], correct:0, fact:"William Herschel discovered Uranus with a telescope in 1781 — the first planet found in modern times." },
+      { q:"What color is Uranus?", choices:["Deep red","Pale blue-green","Bright yellow","Solid white"], correct:1, fact:"Methane in Uranus's atmosphere gives it a pale blue-green color." },
+      { q:"True or false: Uranus has rings.", choices:["True","False"], correct:0, fact:"Uranus has a faint set of rings, discovered in 1977 — much harder to see than Saturn's." },
+      { q:"How many moons does Uranus have (roughly)?", choices:["2","27","79","150"], correct:1, fact:"Uranus has around 27 known moons, many named after Shakespeare characters." },
+      { q:"One Uranus year equals about how many Earth years?", choices:["8","29","84","165"], correct:2, fact:"It takes Uranus about 84 Earth years to orbit the Sun once." },
+    ],
+    saturn: [
+      { q:"What are Saturn's rings mostly made of?", choices:["Solid metal","Ice and rock chunks","Gas clouds","Dust only"], correct:1, fact:"Saturn's rings are made of countless chunks of ice and rock, some tiny, some as big as a house." },
+      { q:"Saturn is mostly made of:", choices:["Rock","Hydrogen and helium","Ice","Iron"], correct:1, fact:"Saturn is a gas giant, made almost entirely of hydrogen and helium, like the Sun." },
+      { q:"Saturn's largest moon is:", choices:["Titan","Triton","Ganymede","Phobos"], correct:0, fact:"Titan is bigger than the planet Mercury and has its own thick atmosphere." },
+      { q:"Could Saturn float in water?", choices:["No, it would sink","Yes, it's less dense than water","It would explode","Only half of it would float"], correct:1, fact:"Saturn is so light for its size that it would actually float in a giant bathtub." },
+      { q:"How long is a day on Saturn?", choices:["About 10 hours","24 hours","48 hours","1 week"], correct:0, fact:"Saturn spins fast — a day there is only about 10.5 hours long." },
+      { q:"Saturn is the ___ planet from the Sun.", choices:["Fifth","Sixth","Seventh","Eighth"], correct:1, fact:"Saturn is the sixth planet from the Sun." },
+    ],
+    jupiter: [
+      { q:"Jupiter is famous for its giant:", choices:["Volcano","Red spot storm","Ice cap","Crater"], correct:1, fact:"The Great Red Spot is a storm bigger than Earth that has raged for hundreds of years." },
+      { q:"Jupiter is the ___ planet in the solar system.", choices:["Smallest","Largest","Hottest","Closest to the Sun"], correct:1, fact:"Jupiter is by far the largest planet — more than twice as massive as all other planets combined." },
+      { q:"How many moons does Jupiter have (roughly)?", choices:["4","12","95","300"], correct:2, fact:"Jupiter has around 95 known moons, including four huge ones spotted by Galileo in 1610." },
+      { q:"What is Jupiter mostly made of?", choices:["Rock and metal","Hydrogen and helium gas","Ice","Liquid water"], correct:1, fact:"Like Saturn, Jupiter is a gas giant made mostly of hydrogen and helium." },
+      { q:"Jupiter's gravity is so strong it can:", choices:["Pull asteroids away from Earth","Make time slow down","Turn into a star","Freeze nearby moons instantly"], correct:0, fact:"Jupiter's huge gravity helps shield Earth by pulling in or flinging away some asteroids and comets." },
+      { q:"A day on Jupiter is about:", choices:["10 hours","24 hours","3 days","1 week"], correct:0, fact:"Despite being huge, Jupiter spins incredibly fast — a day is under 10 hours." },
+    ],
+    mars: [
+      { q:"Why does Mars look red?", choices:["Red water","Iron oxide (rust) in its soil","Red clouds","Reflected sunlight"], correct:1, fact:"Mars's surface is covered in iron oxide — basically, rusty dust." },
+      { q:"True or false: Mars has seasons like Earth.", choices:["True","False"], correct:0, fact:"Mars is tilted similarly to Earth, so it has seasons — just longer ones." },
+      { q:"Which of these has NOT explored Mars?", choices:["A rover","A helicopter","An astronaut","An orbiter"], correct:2, fact:"No human has been to Mars yet — only robots, rovers, and even a tiny helicopter called Ingenuity." },
+      { q:"Mars has the largest volcano in the solar system, called:", choices:["Mount Everest","Olympus Mons","Mauna Kea","Vesuvius"], correct:1, fact:"Olympus Mons is about three times taller than Mount Everest." },
+      { q:"How many moons does Mars have?", choices:["0","1","2","14"], correct:2, fact:"Mars has two small, lumpy moons named Phobos and Deimos." },
+      { q:"Which statement about Mars is FALSE?", choices:["It's smaller than Earth","It has ice at its poles","It has breathable air","It's the fourth planet from the Sun"], correct:2, fact:"Mars's atmosphere is mostly carbon dioxide and far too thin to breathe." },
+    ],
+    earth: [
+      { q:"About what percent of Earth's surface is covered in water?", choices:["30%","50%","71%","90%"], correct:2, fact:"Roughly 71% of Earth's surface is covered by oceans." },
+      { q:"Earth is the only known planet with:", choices:["Mountains","Confirmed life","A moon","Water in any form"], correct:1, fact:"As far as we know, Earth is the only planet in the universe confirmed to host life." },
+      { q:"What protects Earth from harmful solar radiation?", choices:["The Moon","Its magnetic field","The oceans","Its speed"], correct:1, fact:"Earth's magnetic field, generated deep inside the planet, shields us from much of the Sun's radiation." },
+      { q:"Which of these is a cause of Earth's seasons?", choices:["Distance from the Sun changing a lot","Earth's tilt on its axis","The Moon's gravity","Ocean currents alone"], correct:1, fact:"Earth's 23.5-degree tilt is the main reason we get seasons, not our distance from the Sun." },
+      { q:"How old is Earth, roughly?", choices:["4.5 million years","45,000 years","4.5 billion years","450 million years"], correct:2, fact:"Earth formed about 4.5 billion years ago." },
+      { q:"Which layer of Earth is liquid metal?", choices:["Crust","Mantle","Outer core","Atmosphere"], correct:2, fact:"Earth's outer core is made of liquid iron and nickel, and its motion creates our magnetic field." },
+    ],
+    venus: [
+      { q:"Venus is the hottest planet in the solar system because of:", choices:["Being closest to the Sun","A thick, trapping atmosphere","Constant volcanoes","Its fast spin"], correct:1, fact:"Venus isn't the closest planet to the Sun, but its thick CO2 atmosphere traps heat, making it hotter than Mercury." },
+      { q:"A day on Venus is longer than its:", choices:["Hour","Week","Year","Second"], correct:2, fact:"Venus spins so slowly that one day there lasts longer than one full trip around the Sun." },
+      { q:"Which direction does Venus spin, compared to most planets?", choices:["The same direction","Backwards","It doesn't spin","Sideways only"], correct:1, fact:"Venus rotates backwards (retrograde) compared to most other planets." },
+      { q:"Venus is often called Earth's ___ because of its similar size.", choices:["Twin","Shadow","Cousin","Mirror"], correct:0, fact:"Venus is close to Earth in size and mass, earning it the nickname 'Earth's twin' — though its surface is nothing alike." },
+      { q:"What would happen to a spacecraft that lands on Venus?", choices:["It floats away","It freezes instantly","Extreme heat and pressure destroy it quickly","Nothing, it's safe"], correct:2, fact:"Venus's heat and crushing pressure have destroyed every lander sent there within hours." },
+    ],
+    mercury: [
+      { q:"Mercury is the ___ planet from the Sun.", choices:["First","Second","Third","Closest but not first"], correct:0, fact:"Mercury is the closest planet to the Sun." },
+      { q:"Mercury has almost no:", choices:["Craters","Atmosphere","Gravity","Rock"], correct:1, fact:"Mercury has barely any atmosphere, so it can't trap heat — it's scorching by day and freezing by night." },
+      { q:"How long is one year on Mercury?", choices:["About 88 Earth days","About 1 Earth year","About 200 Earth days","About 365 Earth days"], correct:0, fact:"Mercury zips around the Sun in just about 88 Earth days — the shortest year of any planet." },
+      { q:"Mercury's surface looks most similar to:", choices:["Earth's oceans","The Moon","Mars's canyons","Jupiter's clouds"], correct:1, fact:"Mercury is covered in craters and looks a lot like our Moon." },
+      { q:"Mercury has no moons. True or false?", choices:["True","False"], correct:0, fact:"Mercury and Venus are the only two planets in our solar system with zero moons." },
+    ],
+  };
+
+  const BOSS_QUESTIONS = [
+    { q:"The Sun is mostly made of:", choices:["Fire","Hydrogen and helium","Molten rock","Solid gold"], correct:1, fact:"The Sun is a giant ball of hydrogen and helium gas, fusing atoms to make light and heat." },
+    { q:"What process powers the Sun?", choices:["Burning like a campfire","Nuclear fusion","Chemical reactions","Lightning"], correct:1, fact:"The Sun fuses hydrogen into helium in its core, releasing enormous energy." },
+    { q:"How long does sunlight take to reach Earth?", choices:["Instantly","About 8 minutes","1 hour","1 day"], correct:1, fact:"Light from the Sun takes about 8 minutes and 20 seconds to reach Earth." },
+    { q:"The Sun's outer atmosphere is called the:", choices:["Core","Crust","Corona","Mantle"], correct:2, fact:"The corona is the Sun's outer atmosphere, visible as a glow during a total solar eclipse." },
+    { q:"About how many Earths could fit inside the Sun?", choices:["100","1,300,000","1,000","50"], correct:1, fact:"The Sun is so big that about 1.3 million Earths could fit inside it." },
+    { q:"What is a solar flare?", choices:["A shooting star","A sudden burst of energy from the Sun","A type of moon","A comet's tail"], correct:1, fact:"Solar flares are sudden explosions of energy from the Sun's surface." },
+    { q:"The Sun is classified as a:", choices:["Planet","Star","Comet","Asteroid"], correct:1, fact:"The Sun is a star — a massive ball of glowing plasma held together by gravity." },
+    { q:"Roughly how old is the Sun?", choices:["4.6 billion years","1 million years","10,000 years","100 billion years"], correct:0, fact:"The Sun is about 4.6 billion years old — roughly the same age as Earth." },
+  ];
+
+  const MODES = {
+    junior: { label:'Junior Explorer', timerMult:1.6, shields:4, needCorrect:4 },
+    cadet: { label:'Solar Cadet', timerMult:1, shields:3, needCorrect:5 },
+  };
+
+  function pickQuestions(pool, n){
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, Math.min(n, shuffled.length));
+  }
+  function shuffleChoices(question){
+    const idxs = question.choices.map((_, i) => i);
+    const shuffled = [...idxs].sort(() => Math.random() - 0.5);
+    return { ...question, choices: shuffled.map(i => question.choices[i]), correct: shuffled.indexOf(question.correct) };
+  }
+
+  /* ============================================================
+     Icon / SVG helpers (return HTML strings)
+     ============================================================ */
+  function svgIcon(name, size){
+    const paths = {
+      shield: '<path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6l7-3z"/>',
+      star: '<path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 16.9 5.8 20.3l1.6-6.8L2.2 8.9l6.9-.6L12 2z"/>',
+      rocket: '<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 19 4c0 2.16-.63 5.9-3 8a22.35 22.35 0 0 1-4 3z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',
+      trophy: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h2.5a2.5 2.5 0 0 1 0 5H17M7 5H4.5a2.5 2.5 0 0 0 0 5H7"/>',
+      rotate: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>',
+      heart: '<path d="M12 21s-7.5-4.6-10-9.3C.3 8.2 2 4.5 5.6 4.1c2-.2 3.6.8 4.4 2.3.8-1.5 2.4-2.5 4.4-2.3 3.6.4 5.3 4.1 3.6 7.6C19.5 16.4 12 21 12 21z"/>',
+    };
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths[name]||''}</svg>`;
+  }
+  function shieldIconFilled(size, filled, color){
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${filled?color:'none'}" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6l7-3z"/></svg>`;
+  }
+  function starIconFilled(size, color){
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 16.9 5.8 20.3l1.6-6.8L2.2 8.9l6.9-.6L12 2z"/></svg>`;
+  }
+
+  function planetIconSVG(planet, size, mood, dim){
+    const eyeY = mood === 'sad' ? 24 : 22;
+    let ringMarkup = '';
+    if (planet.ring === true) ringMarkup = `<ellipse cx="32" cy="34" rx="30" ry="8" fill="none" stroke="${planet.accent}" stroke-width="4" opacity="0.9"/>`;
+    if (planet.ring === 'tilt') ringMarkup = `<ellipse cx="32" cy="32" rx="10" ry="26" fill="none" stroke="${planet.accent}" stroke-width="3" opacity="0.7" transform="rotate(20 32 32)"/>`;
+    const spotMarkup = planet.spot ? `<ellipse cx="24" cy="26" rx="6" ry="4" fill="${planet.accent}" opacity="0.8"/>` : '';
+    let mouth = '';
+    if (mood === 'happy') mouth = '<path d="M24 36 Q32 42 40 36" stroke="#1A1B22" stroke-width="2.4" fill="none" stroke-linecap="round"/>';
+    else if (mood === 'sad') mouth = '<path d="M25 40 Q32 35 39 40" stroke="#1A1B22" stroke-width="2.4" fill="none" stroke-linecap="round"/>';
+    else if (mood === 'excited') mouth = '<ellipse cx="32" cy="38" rx="4" ry="3" fill="#1A1B22"/>';
+    else mouth = '<path d="M25 37 Q32 40 39 37" stroke="#1A1B22" stroke-width="2.4" fill="none" stroke-linecap="round"/>';
+    return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" style="opacity:${dim?0.35:1};transition:opacity .3s ease;">
+      ${ringMarkup}
+      <circle cx="32" cy="30" r="20" fill="${planet.color}"/>
+      ${spotMarkup}
+      <circle cx="26" cy="${eyeY}" r="2.6" fill="#1A1B22"/>
+      <circle cx="38" cy="${eyeY}" r="2.6" fill="#1A1B22"/>
+      ${mouth}
+    </svg>`;
+  }
+
+  function sunIconSVG(size, mood, hurt){
+    hurt = hurt || 0;
+    const rays = 12;
+    let lines = '';
+    for (let i = 0; i < rays; i++){
+      const angle = (i / rays) * Math.PI * 2;
+      const inner = 32, outer = 46 - hurt * 4;
+      const x1 = 50 + Math.cos(angle) * inner, y1 = 50 + Math.sin(angle) * inner;
+      const x2 = 50 + Math.cos(angle) * outer, y2 = 50 + Math.sin(angle) * outer;
+      lines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#FFB84D" stroke-width="5" stroke-linecap="round"/>`;
+    }
+    const mouth = mood === 'hurt'
+      ? '<path d="M40 60 Q50 54 60 60" stroke="#7A3E00" stroke-width="3" fill="none" stroke-linecap="round"/>'
+      : '<path d="M40 56 Q50 64 60 56" stroke="#7A3E00" stroke-width="3" fill="none" stroke-linecap="round"/>';
+    return `<svg width="${size}" height="${size}" viewBox="0 0 100 100">
+      ${lines}
+      <circle cx="50" cy="50" r="30" fill="#FFC24D"/>
+      <circle cx="42" cy="46" r="3.2" fill="#7A3E00"/>
+      <circle cx="58" cy="46" r="3.2" fill="#7A3E00"/>
+      ${mouth}
+    </svg>`;
+  }
+
+  function orbitPathHTML(currentIndex, completedCount){
+    let html = '<div class="planet-row">';
+    PLANETS.forEach((p, i) => {
+      const isCurrent = i === currentIndex;
+      html += `<div class="planet-wrap ${isCurrent ? 'current' : ''}">${planetIconSVG(p, 34, i < completedCount ? 'happy' : 'idle', i > completedCount)}</div>`;
+      html += `<div class="planet-connector ${i < completedCount ? 'done' : ''}"></div>`;
+    });
+    html += `<div style="opacity:${completedCount >= PLANETS.length ? 1 : 0.35}; transition:opacity .3s ease;">${sunIconSVG(38)}</div>`;
+    html += '</div>';
+    return html;
+  }
+
+  /* ============================================================
+     Game state
+     ============================================================ */
+  let screen = 'start';
+  let sidebarOpen = false;
+  let modeKey = 'cadet';
+  let planetIndex = 0;
+  let stageQuestions = [];
+  let qIndex = 0;
+  let shields = 3;
+  let score = 0;
+  let streak = 0;
+  let timeLeft = 15;
+  let timeTotal = 15;
+  let selected = null;
+  let feedback = null;
+  let eliminated = [];
+  let heat = 0;
+  let bossHealth = BOSS_QUESTIONS.length;
+  let bossQIndex = 0;
+  let bossQuestions = [];
+  let correctInStage = 0;
+  let timerId = null;
+
+  function mode(){ return MODES[modeKey]; }
+  function currentPlanet(){ return PLANETS[planetIndex]; }
+
+  function clearTimer(){ if (timerId) { clearInterval(timerId); timerId = null; } }
+
+  function startCountdown(onTimeout){
+    clearTimer();
+    timerId = setInterval(() => {
+      timeLeft -= 1;
+      if (timeLeft <= 0){
+        clearTimer();
+        timeLeft = 0;
+        updateTimerUI();
+        onTimeout();
+      } else {
+        updateTimerUI();
+      }
+    }, 1000);
+  }
+
+  function updateTimerUI(){
+    const fill = $('timerFill');
+    const text = $('timerText');
+    if (!fill || !text) return;
+    fill.style.width = Math.max(0, (timeLeft / timeTotal) * 100) + '%';
+    fill.style.background = timeLeft <= 3 ? '#FF5C5C' : currentPlanet().accent;
+    text.textContent = timeLeft + 's';
+  }
+
+  function startStage(pIdx){
+    const planet = PLANETS[pIdx];
+    const pool = QUESTIONS[planet.key];
+    stageQuestions = pickQuestions(pool, Math.max(mode().needCorrect + 2, 5)).map(shuffleChoices);
+    qIndex = 0; selected = null; feedback = null; eliminated = []; heat = 0;
+    correctInStage = 0;
+    timeTotal = Math.round(planet.timer * mode().timerMult);
+    timeLeft = timeTotal;
+    screen = 'playing';
+    render();
+    startCountdown(() => handleAnswer(null));
+  }
+
+  function beginGame(){
+    planetIndex = 0;
+    shields = mode().shields;
+    score = 0;
+    streak = 0;
+    startStage(0);
+  }
+
+  function handleAnswer(choiceIdx){
+    if (feedback) return;
+    clearTimer();
+    const q = stageQuestions[qIndex];
+    const correct = choiceIdx !== null && choiceIdx === q.correct;
+    selected = choiceIdx;
+    feedback = { correct, fact: q.fact };
+
+    if (correct){
+      score += 100 + streak * 10;
+      streak += 1;
+      if (currentPlanet().twist === 'heat') heat = 0;
+    } else {
+      streak = 0;
+      if (currentPlanet().twist === 'heat'){
+        heat += 1;
+        if (heat >= 2){ shields = Math.max(0, shields - 1); heat = 0; }
+      } else {
+        shields = Math.max(0, shields - 1);
+      }
+    }
+    render();
+  }
+
+  function proceedAfterFeedback(){
+    const wasCorrect = feedback.correct;
+    if (wasCorrect) correctInStage += 1;
+
+    if (shields <= 0 && !wasCorrect){ screen = 'gameover'; render(); return; }
+    if (correctInStage >= mode().needCorrect){ screen = 'stageComplete'; render(); return; }
+
+    if (qIndex + 1 >= stageQuestions.length){
+      const usedQs = new Set(stageQuestions.map(q => q.q));
+      const morePool = QUESTIONS[currentPlanet().key].filter(q => !usedQs.has(q.q));
+      const extra = pickQuestions(morePool.length ? morePool : QUESTIONS[currentPlanet().key], 4).map(shuffleChoices);
+      stageQuestions = stageQuestions.concat(extra);
+    }
+    qIndex += 1; selected = null; feedback = null; eliminated = [];
+    timeTotal = Math.round(currentPlanet().timer * mode().timerMult);
+    timeLeft = timeTotal;
+
+    if (currentPlanet().twist === 'elimination'){
+      const nextQ = stageQuestions[qIndex];
+      if (nextQ){
+        const wrongIdxs = nextQ.choices.map((_, i) => i).filter(i => i !== nextQ.correct);
+        eliminated = wrongIdxs.sort(() => Math.random() - 0.5).slice(0, Math.max(0, wrongIdxs.length - 1));
+      }
+    }
+    render();
+    startCountdown(() => handleAnswer(null));
+  }
+
+  function goToNextPlanet(){
+    const nextIdx = planetIndex + 1;
+    if (nextIdx >= PLANETS.length){
+      bossQuestions = pickQuestions(BOSS_QUESTIONS, BOSS_QUESTIONS.length).map(shuffleChoices);
+      bossQIndex = 0; bossHealth = bossQuestions.length;
+      selected = null; feedback = null;
+      timeTotal = 10; timeLeft = 10;
+      screen = 'boss';
+      render();
+      startCountdown(() => handleBossAnswer(null));
+      return;
+    }
+    planetIndex = nextIdx;
+    startStage(nextIdx);
+  }
+
+  function handleBossAnswer(choiceIdx){
+    if (feedback) return;
+    clearTimer();
+    const q = bossQuestions[bossQIndex];
+    const correct = choiceIdx !== null && choiceIdx === q.correct;
+    selected = choiceIdx;
+    feedback = { correct, fact: q.fact };
+    if (correct){
+      score += 150 + streak * 10;
+      streak += 1;
+      bossHealth = Math.max(0, bossHealth - 1);
+    } else {
+      streak = 0;
+      shields = Math.max(0, shields - 1);
+    }
+    render();
+  }
+
+  function proceedAfterBossFeedback(){
+    if (shields <= 0 && !feedback.correct){ screen = 'gameover'; render(); return; }
+    if (bossHealth <= 0){ screen = 'win'; render(); return; }
+    if (bossQIndex + 1 >= bossQuestions.length){ screen = bossHealth <= 0 ? 'win' : 'gameover'; render(); return; }
+    bossQIndex += 1; selected = null; feedback = null;
+    timeTotal = 10; timeLeft = 10;
+    render();
+    startCountdown(() => handleBossAnswer(null));
+  }
+
+  function rank(){
+    if (score >= 3500) return 'Solar Navigator';
+    if (score >= 2200) return 'Helios Master';
+    return 'Elio Champion';
+  }
+
+  /* ============================================================
+     Render
+     ============================================================ */
+  function render(){
+    const c = $('content');
+    if (screen === 'start') c.innerHTML = renderStart();
+    else if (screen === 'playing') c.innerHTML = renderPlaying();
+    else if (screen === 'stageComplete') c.innerHTML = renderStageComplete();
+    else if (screen === 'boss') c.innerHTML = renderBoss();
+    else if (screen === 'win') c.innerHTML = renderWin();
+    else if (screen === 'gameover') c.innerHTML = renderGameOver();
+    if (screen === 'playing' || screen === 'boss') updateTimerUI();
+  }
+
+  function renderStart(){
+    let modeButtons = '';
+    Object.entries(MODES).forEach(([key, m]) => {
+      modeButtons += `<button class="mode-btn eliov-btn ${modeKey === key ? 'active' : ''}" data-action="selectMode" data-mode="${key}">${m.label}</button>`;
+    });
+    return `
+      <div class="floatUp" style="text-align:center;">
+        <div style="display:flex;justify-content:center;margin-bottom:8px;">${sunIconSVG(90)}</div>
+        <h1 style="font-family:'Baloo 2',sans-serif;font-weight:800;font-size:36px;margin:4px 0 2px;letter-spacing:-0.01em;">ElioView</h1>
+        <p style="font-family:'Baloo 2',sans-serif;font-weight:600;font-size:20px;color:#FFB84D;margin:0 0 6px;">Race to the Sun</p>
+        <p style="opacity:.75;font-size:15px;margin:0 0 26px;">Answer. Advance. Reach the Sun.</p>
+        <div style="display:flex;justify-content:center;margin-bottom:22px;">${orbitPathHTML(-1, 0)}</div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-bottom:24px;flex-wrap:wrap;">${modeButtons}</div>
+        <button class="btn-primary eliov-btn" data-action="beginGame">${svgIcon('rocket',20)} Launch</button>
+      </div>`;
+  }
+
+  function renderPlaying(){
+    const q = stageQuestions[qIndex];
+    if (!q) return '';
+    const cp = currentPlanet();
+    let shieldsHTML = '';
+    for (let i = 0; i < mode().shields; i++){
+      shieldsHTML += shieldIconFilled(20, i < shields, i < shields ? '#FFB84D' : 'rgba(255,255,255,0.25)');
+    }
+    let choicesHTML = '';
+    q.choices.forEach((choice, i) => {
+      if (eliminated.includes(i)){ choicesHTML += '<div></div>'; return; }
+      const isCorrect = feedback && i === q.correct;
+      const isWrongPick = feedback && selected === i && i !== q.correct;
+      const cls = isCorrect ? 'correct' : isWrongPick ? 'wrongpick' : '';
+      choicesHTML += `<button class="choice-btn eliov-btn ${cls}" ${feedback ? 'disabled' : ''} data-action="answer" data-index="${i}">${choice}</button>`;
+    });
+    const heatNote = (cp.twist === 'heat' && heat > 0) ? ' <span style="color:#FF8A5C;">· heating up!</span>' : '';
+    const feedbackHTML = feedback ? `
+      <div class="feedback-block floatUp">
+        <p class="feedback-title ${feedback.correct ? 'correct' : 'wrong'}">${feedback.correct ? 'Correct!' : 'Not quite.'}</p>
+        <p class="feedback-fact">${feedback.fact}</p>
+        <button class="btn-continue eliov-btn" data-action="continue">Continue</button>
+      </div>` : '';
+
+    return `
+      ${orbitPathHTML(planetIndex, planetIndex)}
+      <div class="hud-row">
+        <div class="shields">${shieldsHTML}</div>
+        <div class="score">${starIconFilled(13,'#FFB84D')}${score}</div>
+      </div>
+      <div class="timer-track"><div class="timer-fill" id="timerFill" style="width:100%;background:${cp.accent};"></div></div>
+      <p class="timer-text" id="timerText">${timeLeft}s</p>
+      <div class="planet-header">
+        ${planetIconSVG(cp, 44, feedback ? (feedback.correct ? 'happy' : 'sad') : 'idle')}
+        <div>
+          <h3>${cp.name}</h3>
+          <p>${correctInStage}/${mode().needCorrect} correct to advance${heatNote}</p>
+        </div>
+      </div>
+      <div class="question-card eliov-card ${feedback && !feedback.correct ? 'wrong' : ''}"><p>${q.q}</p></div>
+      <div class="choices-grid" style="grid-template-columns:${q.choices.length > 2 ? '1fr 1fr' : '1fr'};">${choicesHTML}</div>
+      ${feedbackHTML}
+    `;
+  }
+
+  function renderStageComplete(){
+    const cp = currentPlanet();
+    const nextLabel = planetIndex + 1 < PLANETS.length ? `Course set for ${PLANETS[planetIndex + 1].name}.` : "Course set for the Sun's corona.";
+    return `
+      <div class="center-screen floatUp">
+        ${planetIconSVG(cp, 80, 'happy')}
+        <h2 style="font-family:'Baloo 2',sans-serif;font-weight:800;font-size:24px;margin:18px 0 6px;">${cp.name} cleared!</h2>
+        <p style="opacity:.75;margin-bottom:26px;">${nextLabel}</p>
+        <button class="btn-primary eliov-btn" data-action="nextPlanet">Continue journey</button>
+      </div>`;
+  }
+
+  function renderBoss(){
+    const q = bossQuestions[bossQIndex];
+    if (!q) return '';
+    let shieldsHTML = '';
+    for (let i = 0; i < mode().shields; i++){
+      shieldsHTML += shieldIconFilled(18, i < shields, i < shields ? '#FFB84D' : 'rgba(255,255,255,0.25)');
+    }
+    let choicesHTML = '';
+    q.choices.forEach((choice, i) => {
+      const isCorrect = feedback && i === q.correct;
+      const isWrongPick = feedback && selected === i && i !== q.correct;
+      const cls = isCorrect ? 'correct' : isWrongPick ? 'wrongpick' : '';
+      choicesHTML += `<button class="choice-btn boss eliov-btn ${cls}" ${feedback ? 'disabled' : ''} data-action="bossAnswer" data-index="${i}">${choice}</button>`;
+    });
+    const feedbackHTML = feedback ? `
+      <div class="feedback-block floatUp">
+        <p class="feedback-title ${feedback.correct ? 'correct' : 'wrong'}">${feedback.correct ? 'Direct hit!' : 'The Sun holds strong.'}</p>
+        <p class="feedback-fact">${feedback.fact}</p>
+        <button class="btn-continue eliov-btn" data-action="bossContinue">Continue</button>
+      </div>` : '';
+
+    return `
+      <div style="text-align:center;margin-bottom:14px;">
+        ${sunIconSVG(70, feedback && !feedback.correct ? 'hurt' : 'idle', Math.max(0, BOSS_QUESTIONS.length - bossHealth))}
+        <p style="font-family:'Baloo 2',sans-serif;font-weight:800;font-size:18px;margin:6px 0 0;color:#FFB84D;">Solar Boss Round</p>
+      </div>
+      <div class="timer-track" style="height:10px;border-radius:5px;">
+        <div style="height:100%;width:${(bossHealth / bossQuestions.length) * 100}%;background:linear-gradient(90deg,#FFB84D,#FF5C5C);transition:width .3s ease;"></div>
+      </div>
+      <p style="font-size:11px;opacity:.6;text-align:center;margin:0 0 16px;">Solar flare meter</p>
+      <div class="hud-row" style="margin:0 0 10px;">
+        <div class="shields">${shieldsHTML}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12px;opacity:.7;" id="timerText">${timeLeft}s</div>
+      </div>
+      <div id="timerFill" style="display:none;"></div>
+      <div class="question-card boss eliov-card"><p>${q.q}</p></div>
+      <div class="choices-grid" style="grid-template-columns:1fr 1fr;">${choicesHTML}</div>
+      ${feedbackHTML}
+    `;
+  }
+
+  function renderWin(){
+    return `
+      <div class="center-screen floatUp" style="padding-top:40px;">
+        <div style="margin-bottom:10px;">${svgIcon('trophy',64).replace('currentColor','#FFB84D')}</div>
+        <h2 style="font-family:'Baloo 2',sans-serif;font-weight:800;font-size:26px;margin:4px 0 4px;">You reached the Sun!</h2>
+        <p style="opacity:.75;margin:0 0 20px;">You crossed 4.6 billion miles of solar-system trivia.</p>
+        <div class="stat-card">
+          <p class="stat-label">FINAL SCORE</p>
+          <p class="stat-score">${score}</p>
+          <p class="stat-label">RANK</p>
+          <p class="stat-rank">${rank()}</p>
+        </div>
+        <div><button class="btn-primary eliov-btn" data-action="restart">${svgIcon('rotate',18)} Play again</button></div>
+      </div>`;
+  }
+
+  function renderGameOver(){
+    const cp = currentPlanet();
+    return `
+      <div class="center-screen floatUp" style="padding-top:50px;">
+        ${planetIconSVG(cp, 70, 'sad')}
+        <h2 style="font-family:'Baloo 2',sans-serif;font-weight:800;font-size:24px;margin:16px 0 6px;">Out of shields near ${cp.name}</h2>
+        <p style="opacity:.75;margin-bottom:8px;">Score: ${score}</p>
+        <p style="opacity:.6;font-size:13.5px;margin-bottom:26px;">Every trip through the solar system teaches you something new. Try again?</p>
+        <button class="btn-primary eliov-btn" data-action="restart">${svgIcon('rotate',18)} Try again</button>
+      </div>`;
+  }
+
+  /* ============================================================
+     Event delegation
+     ============================================================ */
+  $('content').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    if (action === 'selectMode'){ modeKey = btn.dataset.mode; render(); }
+    else if (action === 'beginGame') beginGame();
+    else if (action === 'answer') handleAnswer(parseInt(btn.dataset.index, 10));
+    else if (action === 'continue') proceedAfterFeedback();
+    else if (action === 'nextPlanet') goToNextPlanet();
+    else if (action === 'bossAnswer') handleBossAnswer(parseInt(btn.dataset.index, 10));
+    else if (action === 'bossContinue') proceedAfterBossFeedback();
+    else if (action === 'restart'){ screen = 'start'; render(); }
+  });
+
+  /* ============================================================
+     Sidebar
+     ============================================================ */
+  $('sunLogoSlot').innerHTML = sunIconSVG(26) + '<span>ElioView</span>';
+  const sidebarEl = $('sidebar'), backdropEl = $('backdrop'), shiftWrapEl = $('shiftWrap');
+  $('sidebarToggle').addEventListener('click', () => {
+    sidebarOpen = !sidebarOpen;
+    sidebarEl.classList.toggle('open', sidebarOpen);
+    shiftWrapEl.classList.toggle('open', sidebarOpen);
+    backdropEl.classList.toggle('show', sidebarOpen);
+  });
+  backdropEl.addEventListener('click', () => {
+    sidebarOpen = false;
+    sidebarEl.classList.remove('open'); shiftWrapEl.classList.remove('open'); backdropEl.classList.remove('show');
+  });
+
+  /* ============================================================
+     Starfield (generated once, not re-rendered)
+     ============================================================ */
+  const starfield = $('starfield');
+  for (let i = 0; i < 60; i++){
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2 + 0.6;
+    s.style.left = (Math.random() * 100) + '%';
+    s.style.top = (Math.random() * 100) + '%';
+    s.style.width = size + 'px';
+    s.style.height = size + 'px';
+    s.style.animation = `twinkle 3s ease-in-out ${Math.random() * 4}s infinite`;
+    starfield.appendChild(s);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
